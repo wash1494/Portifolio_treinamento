@@ -1,0 +1,35 @@
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+
+# Ambiente virtual Python
+venv/
+env/
+.env
+
+# Arquivos de cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Arquivos de banco de dados locais
+*.xlsx
+*.csv
+
+# Arquivos de imagem temporários
+images/temp_*
+
+# Arquivos de configuração local
+.streamlit/secrets.toml
+.streamlit/
+
+# Arquivos temporários de imagens
+images/temp_*
+
+# Arquivos de log
+*.log
+
+# Arquivos específicos do sistema
+.idea/
+.vscode/

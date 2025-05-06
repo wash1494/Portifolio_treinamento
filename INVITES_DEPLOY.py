@@ -219,56 +219,64 @@ if page == "Library":
         # Registration form
         if st.session_state.current_course:
             # Encontrar o curso selecionado
-            selected_course = courses_df[courses_df['name'] == st.session_state.current_course].iloc[0]
+            filtered_courses = courses_df[courses_df['name'] == st.session_state.current_course]
             
-            st.markdown("---")
-            col1, col2 = st.columns([8, 2])
-            with col1:
-                st.header(f"Inscrição para {selected_course['name']}")
-            with col2:
-                if st.button("✖ Fechar", type="secondary"):
-                    st.session_state.current_course = None
-                    st.rerun()
-            
-            st.markdown(f"""
-            **Descrição do Curso:**  
-            {selected_course['description']}
-            
-            **Vagas disponíveis:** {selected_course['slots'] - selected_course['registered']} de {selected_course['slots']}
-            """)
-            
-            if selected_course['registered'] < selected_course['slots']:
-                def validate_cpf(cpf):
-                    cpf = ''.join(filter(str.isdigit, cpf))
-                    if len(cpf) != 11:
-                        return False
-                    return True
-                
-                def validate_email(email):
-                    import re
-                    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-                    return re.match(pattern, email) is not None
-                
-                with st.form("registration_form"):
-                    name = st.text_input("Nome Completo")
-                    cpf = st.text_input("CPF (apenas números)")
-                    email = st.text_input("Email")
-                    company = st.text_input("Empresa")
-                    
-                    if st.form_submit_button("Inscrever-se"):
-                        if not name or not cpf or not email or not company:
-                            st.error("Por favor, preencha todos os campos.")
-                        elif not validate_cpf(cpf):
-                            st.error("CPF inválido. Por favor, insira 11 dígitos.")
-                        elif not validate_email(email):
-                            st.error("Email inválido. Por favor, verifique o formato.")
-                        else:
-                            save_registration(selected_course['name'], name, cpf, email, company)
-                            st.success(f"Inscrição realizada com sucesso para {selected_course['name']}!")
-                            st.session_state.current_course = None
-                            st.rerun()
+            # Verificar se o curso ainda existe
+            if filtered_courses.empty:
+                st.error(f"O curso '{st.session_state.current_course}' não foi encontrado. Ele pode ter sido excluído.")
+                st.session_state.current_course = None
+                st.rerun()
             else:
-                st.error("Este curso está com vagas esgotadas.")
+                selected_course = filtered_courses.iloc[0]
+                
+                st.markdown("---")
+                col1, col2 = st.columns([8, 2])
+                with col1:
+                    st.header(f"Inscrição para {selected_course['name']}")
+                with col2:
+                    if st.button("✖ Fechar", type="secondary"):
+                        st.session_state.current_course = None
+                        st.rerun()
+                
+                st.markdown(f"""
+                **Descrição do Curso:**  
+                {selected_course['description']}
+                
+                **Vagas disponíveis:** {selected_course['slots'] - selected_course['registered']} de {selected_course['slots']}
+                """)
+                
+                if selected_course['registered'] < selected_course['slots']:
+                    def validate_cpf(cpf):
+                        cpf = ''.join(filter(str.isdigit, cpf))
+                        if len(cpf) != 11:
+                            return False
+                        return True
+                    
+                    def validate_email(email):
+                        import re
+                        pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+                        return re.match(pattern, email) is not None
+                    
+                    with st.form("registration_form"):
+                        name = st.text_input("Nome Completo")
+                        cpf = st.text_input("CPF (apenas números)")
+                        email = st.text_input("Email")
+                        company = st.text_input("Empresa")
+                        
+                        if st.form_submit_button("Inscrever-se"):
+                            if not name or not cpf or not email or not company:
+                                st.error("Por favor, preencha todos os campos.")
+                            elif not validate_cpf(cpf):
+                                st.error("CPF inválido. Por favor, insira 11 dígitos.")
+                            elif not validate_email(email):
+                                st.error("Email inválido. Por favor, verifique o formato.")
+                            else:
+                                save_registration(selected_course['name'], name, cpf, email, company)
+                                st.success(f"Inscrição realizada com sucesso para {selected_course['name']}!")
+                                st.session_state.current_course = None
+                                st.rerun()
+                        else:
+                            st.error("Este curso está com vagas esgotadas.")
 
 # Modificar a seção de Course Management para verificar a autenticação da área administrativa
 elif page == "Course Management":

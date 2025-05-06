@@ -5,15 +5,13 @@ from PIL import Image
 from datetime import datetime
 import io
 import shutil
+import psycopg2  # Importar psycopg2 para conexão com PostgreSQL
 
 # Configure page - DEVE SER O PRIMEIRO COMANDO STREAMLIT
 st.set_page_config(page_title="Training Portfolio", layout="wide")
 
-# Modificar os caminhos de arquivo para serem relativos em vez de absolutos
-# Isso é necessário para que o aplicativo funcione quando hospedado
-IMAGES_DIR = "images"
-COURSES_DB = "courses.xlsx"
-REGISTRATIONS_DB = "registrations.xlsx"
+# Configuração de diretórios e imagens
+IMAGES_DIR = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\images"
 DEFAULT_IMAGE = os.path.join(IMAGES_DIR, "default_course.png")
 
 # Create images directory if it doesn't exist
@@ -23,6 +21,62 @@ os.makedirs(IMAGES_DIR, exist_ok=True)
 if not os.path.exists(DEFAULT_IMAGE):
     img = Image.new('RGB', (400, 300), color='gray')
     img.save(DEFAULT_IMAGE)
+
+# Função para obter conexão com o SQL Server
+def get_connection():
+    # Obter credenciais do secrets.toml ou usar valores padrão
+    host = st.secrets.get("database", {}).get("host", "localhost")
+    database = st.secrets.get("database", {}).get("database", "training_portfolio")
+    username = st.secrets.get("database", {}).get("username", "postgres")
+    password = st.secrets.get("database", {}).get("password", "sua_senha")
+    port = st.secrets.get("database", {}).get("port", "5432")
+    
+    return psycopg2.connect(
+        host=host,
+        database=database,
+        user=username,
+        password=password,
+        port=port
+    )
+
+# Função para criar tabelas se não existirem
+def create_tables_if_not_exist():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Criar tabela de cursos
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Courses (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            description TEXT,
+            slots INT NOT NULL,
+            image_path VARCHAR(255),
+            registered INT DEFAULT 0,
+            status VARCHAR(20) DEFAULT 'open'
+        )
+        """)
+        
+        # Criar tabela de inscrições
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Registrations (
+            id SERIAL PRIMARY KEY,
+            course_name VARCHAR(100) NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            cpf VARCHAR(11) NOT NULL,
+            email VARCHAR(100) NOT NULL,
+            company VARCHAR(100),
+            registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Erro ao criar tabelas: {e}")
+        # Fallback para Excel se a conexão falhar
+        st.warning("Usando Excel como fallback para armazenamento de dados.")
 
 # Modificar a função get_course_image para redimensionar as imagens
 def get_course_image(image_path):
@@ -45,50 +99,66 @@ def get_course_image(image_path):
 if 'current_course' not in st.session_state:
     st.session_state.current_course = None
 
-# No início do arquivo, após carregar as bibliotecas, adicione esta função de limpeza
-def clean_invalid_courses():
-    if not os.path.exists(COURSES_DB):
-        return False
+# Função para carregar cursos do banco de dados
+def load_courses():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM Courses")
         
-    df = pd.read_excel(COURSES_DB)
-    invalid_courses = []
-    
-    for idx, course in df.iterrows():
-        if not os.path.exists(course['image_path']):
-            invalid_courses.append(idx)
-    
-    if invalid_courses:
-        df = df.drop(invalid_courses)
-        df.to_excel(COURSES_DB, index=False)
-        return True
-    return False
+        columns = [desc[0] for desc in cursor.description]
+        data = []
+        
+        for row in cursor.fetchall():
+            course = dict(zip(columns, row))
+            data.append(course)
+        
+        conn.close()
+        return pd.DataFrame(data)
+    except Exception as e:
+        st.error(f"Erro ao carregar cursos: {e}")
+        # Fallback para Excel
+        return load_courses_from_excel()
 
-# Logo após a definição de IMAGES_DIR, adicione:
-# Limpar cursos com imagens inválidas
-if os.path.exists(COURSES_DB):
-    if clean_invalid_courses():
-        st.warning("Alguns cursos com imagens inválidas foram removidos.")
-
-def migrate_courses_db():
+# Função de fallback para carregar cursos do Excel
+def load_courses_from_excel():
+    COURSES_DB = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\courses.xlsx"
     if os.path.exists(COURSES_DB):
         df = pd.read_excel(COURSES_DB)
         if 'status' not in df.columns:
-            df['status'] = 'open'  # Set default status for existing courses
+            df['status'] = 'open'
             df.to_excel(COURSES_DB, index=False)
         return df
     return pd.DataFrame(columns=['name', 'description', 'slots', 'image_path', 'registered', 'status'])
 
-# Replace the existing load_or_create_courses_db function with:
-def load_or_create_courses_db():
-    return migrate_courses_db()
-
+# Função para salvar um novo curso
 def save_course(name, description, slots, image_file):
-    df = load_or_create_courses_db()
-    
-    # Save image to file
+    # Salvar imagem no sistema de arquivos
     image_path = os.path.join(IMAGES_DIR, f"{name.replace(' ', '_')}.png")
     with open(image_path, 'wb') as f:
         f.write(image_file)
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Inserir curso no banco de dados
+        cursor.execute("""
+            INSERT INTO Courses (name, description, slots, image_path, registered, status)
+            VALUES (?, ?, ?, ?, 0, 'open')
+        """, (name, description, slots, image_path))
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Erro ao salvar curso: {e}")
+        # Fallback para Excel
+        save_course_to_excel(name, description, slots, image_path)
+
+# Função de fallback para salvar curso no Excel
+def save_course_to_excel(name, description, slots, image_path):
+    COURSES_DB = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\courses.xlsx"
+    df = load_courses_from_excel()
     
     new_course = {
         'name': name,
@@ -96,18 +166,71 @@ def save_course(name, description, slots, image_file):
         'slots': slots,
         'image_path': image_path,
         'registered': 0,
-        'status': 'open'  # Default status for new courses
+        'status': 'open'
     }
     df = pd.concat([df, pd.DataFrame([new_course])], ignore_index=True)
     df.to_excel(COURSES_DB, index=False)
 
-def load_or_create_registrations_db():
+# Função para carregar inscrições
+def load_registrations():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM Registrations")
+        
+        columns = [column[0] for column in cursor.description]
+        data = []
+        
+        for row in cursor.fetchall():
+            registration = dict(zip(columns, row))
+            data.append(registration)
+        
+        conn.close()
+        return pd.DataFrame(data)
+    except Exception as e:
+        st.error(f"Erro ao carregar inscrições: {e}")
+        # Fallback para Excel
+        return load_registrations_from_excel()
+
+# Função de fallback para carregar inscrições do Excel
+def load_registrations_from_excel():
+    REGISTRATIONS_DB = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\registrations.xlsx"
     if os.path.exists(REGISTRATIONS_DB):
         return pd.read_excel(REGISTRATIONS_DB)
     return pd.DataFrame(columns=['course_name', 'name', 'cpf', 'email', 'company', 'registration_date'])
 
+# Função para salvar uma nova inscrição
 def save_registration(course_name, name, cpf, email, company):
-    df = load_or_create_registrations_db()
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Inserir inscrição
+        cursor.execute("""
+            INSERT INTO Registrations (course_name, name, cpf, email, company, registration_date)
+            VALUES (?, ?, ?, ?, ?, GETDATE())
+        """, (course_name, name, cpf, email, company))
+        
+        # Atualizar contagem de inscritos no curso
+        cursor.execute("""
+            UPDATE Courses 
+            SET registered = registered + 1 
+            WHERE name = ?
+        """, (course_name))
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        st.error(f"Erro ao salvar inscrição: {e}")
+        # Fallback para Excel
+        save_registration_to_excel(course_name, name, cpf, email, company)
+
+# Função de fallback para salvar inscrição no Excel
+def save_registration_to_excel(course_name, name, cpf, email, company):
+    REGISTRATIONS_DB = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\registrations.xlsx"
+    COURSES_DB = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\courses.xlsx"
+    
+    df = load_registrations_from_excel()
     new_registration = {
         'course_name': course_name,
         'name': name,
@@ -120,11 +243,60 @@ def save_registration(course_name, name, cpf, email, company):
     df.to_excel(REGISTRATIONS_DB, index=False)
     
     # Update course registration count
-    courses_df = load_or_create_courses_db()
+    courses_df = load_courses_from_excel()
     courses_df.loc[courses_df['name'] == course_name, 'registered'] += 1
     courses_df.to_excel(COURSES_DB, index=False)
 
-# Ajustar a seção do menu de navegação
+# Função para atualizar um curso
+def update_course(course_id, name, description, slots, status, image_path=None):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        if image_path:
+            cursor.execute("""
+                UPDATE Courses 
+                SET name = %s, description = %s, slots = %s, status = %s, image_path = %s
+                WHERE id = %s
+            """, (name, description, slots, status, image_path, course_id))
+        else:
+            cursor.execute("""
+                UPDATE Courses 
+                SET name = %s, description = %s, slots = %s, status = %s
+                WHERE id = %s
+            """, (name, description, slots, status, course_id))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao atualizar curso: {e}")
+        return False
+
+# Função para excluir um curso
+def delete_course(course_id, image_path):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("DELETE FROM Courses WHERE id = ?", (course_id))
+        
+        conn.commit()
+        conn.close()
+        
+        # Excluir imagem do curso
+        if os.path.exists(image_path):
+            os.remove(image_path)
+            
+        return True
+    except Exception as e:
+        st.error(f"Erro ao excluir curso: {e}")
+        return False
+
+# Tentar criar tabelas ao iniciar o aplicativo
+create_tables_if_not_exist()
+
+# Ajustar a seção da seção de navegação
 st.sidebar.title("Navigation")
 
 # Botão para a Biblioteca
@@ -143,8 +315,7 @@ with st.sidebar.expander("Management"):
         with st.form("auth_form_admin_area"):
             password = st.text_input("Enter admin password", type="password")
             if st.form_submit_button("Login"):
-                # Usar st.secrets para senhas em ambiente de produção
-                if password == st.secrets.get("passwords", {}).get("admin", "ADMINIDG2025"):
+                if password == "ADMINIDG2025":
                     st.session_state.authenticated_admin_area = True
                     st.rerun()
                 else:
@@ -178,8 +349,7 @@ if page == "Library":
         with st.form("auth_form"):
             password = st.text_input("Enter password", type="password")
             if st.form_submit_button("Login"):
-                # Usar st.secrets para senhas em ambiente de produção
-                if password == st.secrets.get("passwords", {}).get("library", "IDG2025"):
+                if password == "IDG2025":
                     st.session_state.authenticated_library = True
                     st.rerun()
                 else:
@@ -187,7 +357,7 @@ if page == "Library":
     else:
         st.title("Training Library")
         # Filter only open courses
-        courses_df = load_or_create_courses_db()
+        courses_df = load_courses()
         active_courses_df = courses_df[courses_df['status'] == 'open']
         
         # Na seção da Library, onde os cursos são exibidos e o botão "Saiba Mais" é definido
@@ -301,7 +471,7 @@ elif page == "Course Management":
                         st.error("Please fill all fields")
         
         with tab2:
-            courses_df = load_or_create_courses_db()
+            courses_df = load_courses()
             if not courses_df.empty:
                 for idx, course in courses_df.iterrows():
                     # Garantir que status seja uma string
@@ -322,33 +492,23 @@ elif page == "Course Management":
                             st.image(course['image_path'], use_container_width=True)
                             
                             if st.button("Update", key=f"update_{idx}"):
-                                courses_df.loc[idx, 'name'] = new_name
-                                courses_df.loc[idx, 'description'] = new_description
-                                courses_df.loc[idx, 'slots'] = new_slots
-                                courses_df.loc[idx, 'status'] = new_status
-                                
+                                image_path = None
                                 if new_image:
                                     image_path = os.path.join(IMAGES_DIR, f"{new_name.replace(' ', '_')}.png")
                                     with open(image_path, 'wb') as f:
                                         f.write(new_image.getvalue())
-                                    courses_df.loc[idx, 'image_path'] = image_path
                                 
-                                courses_df.to_excel(COURSES_DB, index=False)
-                                st.success("Course updated successfully!")
-                                st.rerun()
+                                if update_course(course['id'], new_name, new_description, new_slots, new_status, image_path):
+                                    st.success("Course updated successfully!")
+                                    st.rerun()
                             
                             if st.button("Delete", type="secondary", key=f"delete_{idx}"):
                                 if course['status'] == 'open' and course['registered'] > 0:
                                     st.error("Cannot delete active course with registered students")
                                 else:
-                                    # Delete image file
-                                    if os.path.exists(course['image_path']):
-                                        os.remove(course['image_path'])
-                                    # Remove from DataFrame
-                                    courses_df = courses_df.drop(idx)
-                                    courses_df.to_excel(COURSES_DB, index=False)
-                                    st.success("Course deleted successfully!")
-                                    st.rerun()
+                                    if delete_course(course['id'], course['image_path']):
+                                        st.success("Course deleted successfully!")
+                                        st.rerun()
             else:
                 st.info("No courses available to manage")
 
@@ -359,8 +519,8 @@ elif page == "Admin Dashboard":
     else:
         st.title("Administrative Dashboard")
         
-        courses_df = load_or_create_courses_db()
-        registrations_df = load_or_create_registrations_db()
+        courses_df = load_courses()
+        registrations_df = load_registrations()
         
         # Display courses statistics
         st.header("Courses Overview")

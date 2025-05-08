@@ -427,3 +427,69 @@ elif page == "Admin Dashboard":
             },
             use_container_width=True
         )
+        
+        # Adicionar seção de detalhes de inscrições
+        st.header("Detalhes de Inscrições")
+        
+        if registrations_df.empty:
+            st.info("Não há inscrições registradas.")
+        else:
+            # Agrupar cursos para seleção
+            cursos_disponiveis = sorted(registrations_df['course_name'].unique())
+            
+            # Opção para visualizar todos os cursos ou filtrar por curso específico
+            opcao_visualizacao = st.radio(
+                "Visualizar inscrições:",
+                ["Todos os cursos", "Filtrar por curso"],
+                horizontal=True
+            )
+            
+            if opcao_visualizacao == "Filtrar por curso":
+                curso_selecionado = st.selectbox("Selecione o curso:", cursos_disponiveis)
+                registrations_filtradas = registrations_df[registrations_df['course_name'] == curso_selecionado]
+            else:
+                registrations_filtradas = registrations_df
+            
+            # Exibir tabela de inscrições
+            if not registrations_filtradas.empty:
+                # Formatar a data de inscrição
+                registrations_filtradas['registration_date'] = pd.to_datetime(
+                    registrations_filtradas['registration_date']
+                ).dt.strftime('%d/%m/%Y %H:%M')
+                
+                # Exibir tabela formatada
+                st.dataframe(
+                    registrations_filtradas,
+                    hide_index=True,
+                    column_config={
+                        "course_name": "Curso",
+                        "name": "Nome",
+                        "cpf": "CPF",
+                        "email": "Email",
+                        "company": "Empresa",
+                        "registration_date": "Data de Inscrição"
+                    },
+                    use_container_width=True
+                )
+                
+                # Opção para exportar para Excel
+                if st.button("Exportar para Excel"):
+                    # Criar um buffer para o arquivo Excel
+                    buffer = io.BytesIO()
+                    
+                    # Salvar o DataFrame no buffer
+                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                        registrations_filtradas.to_excel(writer, index=False, sheet_name='Inscrições')
+                    
+                    # Preparar o download
+                    buffer.seek(0)
+                    
+                    # Oferecer o download
+                    st.download_button(
+                        label="Baixar arquivo Excel",
+                        data=buffer,
+                        file_name=f"inscricoes{'_'+curso_selecionado if opcao_visualizacao == 'Filtrar por curso' else ''}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+            else:
+                st.info(f"Não há inscrições para o curso selecionado.")

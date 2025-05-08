@@ -10,7 +10,7 @@ import shutil
 st.set_page_config(page_title="Training Portfolio", layout="wide")
 
 # Default image configuration
-DEFAULT_IMAGE = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\images\\default_course.png"
+DEFAULT_IMAGE = "c:\\WCD\\GITHUB - CODE\\Portifolio_treinamento\\images\\default_course.png"
 if not os.path.exists(DEFAULT_IMAGE):
     img = Image.new('RGB', (400, 300), color='gray')
     img.save(DEFAULT_IMAGE)
@@ -37,9 +37,9 @@ if 'current_course' not in st.session_state:
     st.session_state.current_course = None
 
 # File paths
-COURSES_DB = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\courses.xlsx"
-REGISTRATIONS_DB = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\registrations.xlsx"
-IMAGES_DIR = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\images"
+COURSES_DB = "c:\\WCD\\GITHUB - CODE\\Portifolio_treinamento\\courses.xlsx"
+REGISTRATIONS_DB = "c:\\WCD\\GITHUB - CODE\\Portifolio_treinamento\\registrations.xlsx"
+IMAGES_DIR = "c:\\WCD\\GITHUB - CODE\\Portifolio_treinamento\\images"
 
 # Create images directory if it doesn't exist
 os.makedirs(IMAGES_DIR, exist_ok=True)
@@ -298,44 +298,41 @@ elif page == "Course Management":
     if not st.session_state.authenticated_admin_area:
         st.warning("Por favor, faça login na área de Management no menu lateral.")
     else:
-        # ...
-        # Na seção "Course Management", onde está o formulário de criação de cursos
-        elif page == "Course Management":
-            st.title("Course Management")
-            
-            # Tabs for Create/Manage courses
-            create_tab, manage_tab = st.tabs(["Create New Course", "Manage Existing Courses"])
-            
-            with create_tab:
-                with st.form("create_course_form"):
-                    name = st.text_input("Course Name")
-                    description = st.text_area("Course Description")
-                    slots = st.number_input("Available Slots", min_value=1, value=20)
-                    
-                    # Adicionar os novos campos de data, hora e local
-                    course_date = st.date_input("Course Date")
-                    course_time = st.time_input("Course Time")
-                    course_location = st.text_input("Course Location")
-                    
-                    uploaded_file = st.file_uploader("Course Banner", type=["png", "jpg", "jpeg"])
-                    
-                    if st.form_submit_button("Save Course"):
-                        if name and description and slots > 0 and uploaded_file:
-                            # Converter o arquivo para bytes
-                            image_bytes = uploaded_file.getvalue()
-                            
-                            # Chamar a função save_course com os novos parâmetros
-                            save_course(name, description, slots, image_bytes, 
-                                       course_date=course_date, 
-                                       course_time=course_time, 
-                                       course_location=course_location)
-                            
-                            st.success(f"Course '{name}' created successfully!")
-                            st.rerun()
-                        else:
-                            st.error("Please fill all required fields")
+        st.title("Course Management")
         
-        with tab2:
+        # Tabs for Create/Manage courses
+        create_tab, manage_tab = st.tabs(["Create New Course", "Manage Existing Courses"])
+        
+        with create_tab:
+            with st.form("create_course_form"):
+                name = st.text_input("Course Name")
+                description = st.text_area("Course Description")
+                slots = st.number_input("Available Slots", min_value=1, value=20)
+                
+                # Adicionar os novos campos de data, hora e local
+                course_date = st.date_input("Course Date")
+                course_time = st.time_input("Course Time")
+                course_location = st.text_input("Course Location")
+                
+                uploaded_file = st.file_uploader("Course Banner", type=["png", "jpg", "jpeg"])
+                
+                if st.form_submit_button("Save Course"):
+                    if name and description and slots > 0 and uploaded_file:
+                        # Converter o arquivo para bytes
+                        image_bytes = uploaded_file.getvalue()
+                        
+                        # Chamar a função save_course com os novos parâmetros
+                        save_course(name, description, slots, image_bytes, 
+                                   course_date=course_date, 
+                                   course_time=course_time, 
+                                   course_location=course_location)
+                        
+                        st.success(f"Course '{name}' created successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Please fill all required fields")
+        
+        with manage_tab:  # Corrigido de tab2 para manage_tab
             courses_df = load_or_create_courses_db()
             if not courses_df.empty:
                 for idx, course in courses_df.iterrows():

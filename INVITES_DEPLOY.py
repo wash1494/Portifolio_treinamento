@@ -10,7 +10,7 @@ import shutil
 st.set_page_config(page_title="Training Portfolio", layout="wide")
 
 # Default image configuration
-DEFAULT_IMAGE = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\images\\default_course.png"
+DEFAULT_IMAGE = "c:\\WCD\\GITHUB - CODE\\Portifolio_treinamento\\images\\default_course.png"
 if not os.path.exists(DEFAULT_IMAGE):
     img = Image.new('RGB', (400, 300), color='gray')
     img.save(DEFAULT_IMAGE)
@@ -37,9 +37,9 @@ if 'current_course' not in st.session_state:
     st.session_state.current_course = None
 
 # File paths
-COURSES_DB = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\courses.xlsx"
-REGISTRATIONS_DB = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\registrations.xlsx"
-IMAGES_DIR = "c:\\WCD\\APP PROGRAMING\\FORMULARIOS DE INVITE\\images"
+COURSES_DB = "c:\\WCD\\GITHUB - CODE\\Portifolio_treinamento\\courses.xlsx"
+REGISTRATIONS_DB = "c:\\WCD\\GITHUB - CODE\\Portifolio_treinamento\\registrations.xlsx"
+IMAGES_DIR = "c:\\WCD\\GITHUB - CODE\\Portifolio_treinamento\\images"
 
 # Create images directory if it doesn't exist
 os.makedirs(IMAGES_DIR, exist_ok=True)

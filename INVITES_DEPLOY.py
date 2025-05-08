@@ -275,8 +275,8 @@ if page == "Library":
                                 st.success(f"Inscrição realizada com sucesso para {selected_course['name']}!")
                                 st.session_state.current_course = None
                                 st.rerun()
-                        else:
-                            st.error("Este curso está com vagas esgotadas.")
+                else:
+                    st.error("Este curso está com vagas esgotadas.")
 
 # Modificar a seção de Course Management para verificar a autenticação da área administrativa
 elif page == "Course Management":

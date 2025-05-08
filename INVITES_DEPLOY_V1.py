@@ -70,15 +70,21 @@ def migrate_courses_db():
         df = pd.read_excel(COURSES_DB)
         if 'status' not in df.columns:
             df['status'] = 'open'  # Set default status for existing courses
-            df.to_excel(COURSES_DB, index=False)
+        if 'course_date' not in df.columns:
+            df['course_date'] = None  # Adicionar campo de data
+        if 'course_time' not in df.columns:
+            df['course_time'] = None  # Adicionar campo de horário
+        if 'course_location' not in df.columns:
+            df['course_location'] = None  # Adicionar campo de local
+        df.to_excel(COURSES_DB, index=False)
         return df
-    return pd.DataFrame(columns=['name', 'description', 'slots', 'image_path', 'registered', 'status'])
+    return pd.DataFrame(columns=['name', 'description', 'slots', 'image_path', 'registered', 'status', 'course_date', 'course_time', 'course_location'])
 
 # Replace the existing load_or_create_courses_db function with:
 def load_or_create_courses_db():
     return migrate_courses_db()
 
-def save_course(name, description, slots, image_file):
+def save_course(name, description, slots, image_file, course_date=None, course_time=None, course_location=None):
     df = load_or_create_courses_db()
     
     # Save image to file
@@ -92,7 +98,10 @@ def save_course(name, description, slots, image_file):
         'slots': slots,
         'image_path': image_path,
         'registered': 0,
-        'status': 'open'  # Default status for new courses
+        'status': 'open',  # Default status for new courses
+        'course_date': course_date,
+        'course_time': course_time,
+        'course_location': course_location
     }
     df = pd.concat([df, pd.DataFrame([new_course])], ignore_index=True)
     df.to_excel(COURSES_DB, index=False)
@@ -242,6 +251,12 @@ if page == "Library":
                 **Descrição do Curso:**  
                 {selected_course['description']}
                 
+                **Data:** {selected_course['course_date'] if pd.notna(selected_course['course_date']) else 'A definir'}
+                
+                **Horário:** {selected_course['course_time'] if pd.notna(selected_course['course_time']) else 'A definir'}
+                
+                **Local:** {selected_course['course_location'] if pd.notna(selected_course['course_location']) else 'A definir'}
+                
                 **Vagas disponíveis:** {selected_course['slots'] - selected_course['registered']} de {selected_course['slots']}
                 """)
                 
@@ -293,11 +308,15 @@ elif page == "Course Management":
                 name = st.text_input("Course Name")
                 description = st.text_area("Course Description")
                 slots = st.number_input("Available Slots", min_value=1, value=20)
+                course_date = st.date_input("Data do Curso", value=None)
+                course_time = st.text_input("Horário do Curso")
+                course_location = st.text_input("Local do Curso")
                 image_file = st.file_uploader("Course Banner", type=['png', 'jpg', 'jpeg'])
                 
                 if st.form_submit_button("Save Course"):
                     if name and description and image_file:
-                        save_course(name, description, slots, image_file.getvalue())
+                        save_course(name, description, slots, image_file.getvalue(), 
+                                   course_date, course_time, course_location)
                         st.success("Course saved successfully!")
                     else:
                         st.error("Please fill all fields")
